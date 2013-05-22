@@ -2356,6 +2356,7 @@ one2one_chat_to_muc(Config) ->
         is_invitation(escalus:wait_for_stanza(Eve)),
         %Bob and Eve accept the invitations
         escalus:send(Bob, stanza_muc_enter_room(Room, <<"bob">>)),
+        timer:sleep(1000),
         escalus:send(Eve, stanza_muc_enter_room(Room, <<"eve">>)),
         escalus:wait_for_stanzas(Bob, 2), %presences; bob receives the history before he receves Eves presence
         escalus:wait_for_stanzas(Eve, 3), %presences
