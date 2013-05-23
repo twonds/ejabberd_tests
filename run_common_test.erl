@@ -46,11 +46,6 @@ tests_to_run() ->
              ]}
     ].
 
-tests_to_run(none) ->
-    tests_to_run();
-tests_to_run(Node) ->
-    [{dir, Node}] ++ tests_to_run().
-
 ct() ->
     Result = ct:run_test(tests_to_run()),
     case Result of
@@ -62,39 +57,15 @@ ct() ->
     init:stop(0).
 
 ct_cover() ->
-    run_ct_covers(get_tested_nodes()),
+    run_ct_cover(),
+    cover_summary(),
     init:stop(0).
 
-run_ct_covers([]) -> 
-    %%There is no tested nodes configuration. Assume that ejabberd node is running
-    run_ct_cover1();
-run_ct_covers([Node | []]) ->
-    run_ct_cover(Node),
-    run_ejabberd(Node),
-    cover_summary(),
-    stop_ejabberd(Node);
-run_ct_covers([Node | Tail]) ->
-    run_ct_cover(Node),
-    run_ct_covers(Tail).
-
-run_ct_cover(Node) ->
-    io:format("will test node ~p~n", [Node]),
-    StartStatus = run_ejabberd(Node),
-    io:format("start status ~p~n", [StartStatus]),
-    NodeStr = get_node_str(Node),
-    os:cmd("cp -R tests "++NodeStr),
-    run_ct_cover1(NodeStr),
-    StopStatus = stop_ejabberd(Node),
-    os:cmd("rm -rf "++NodeStr),
-    io:format("stop status ~p~n", [StopStatus]).
-
-run_ct_cover1() ->
-    run_ct_cover1(none).
-
-run_ct_cover1(Node) ->
+run_ct_cover() ->
     prepare(),
-    ct:run_test(tests_to_run(Node)),
-    analyze(Node),
+    ct:run_test(tests_to_run()),
+    Files = rpc:call(get_ejabberd_node(), filelib, wildcard, ["/tmp/ejd_test_run_*.coverdata"]),
+    [file:delete(File) || File <- Files],
     {MS,S,_} = now(),
     FileName = lists:flatten(io_lib:format("/tmp/ejd_test_run_~b~b.coverdata",[MS,S])),
     io:format("export current cover ~p~n", [cover_call(export, [FileName])]),
@@ -128,9 +99,6 @@ analyze(Node) ->
             R = re:replace(IndexFileData, "<a href=\"all_runs.html\">ALL RUNS</a>", "& <a href=\"cover.html\" style=\"margin-right:5px\">COVER</a>"),
             file:write_file(?CT_REPORT++"/index.html", R),
             ?CT_REPORT++"/cover.html";
-        {_, {ok, IndexFileData}} ->
-            {match, [PosLen]} = re:run(IndexFileData, "<a href=\"(.*"++Node++".*)\">",[{capture, [1]}]),
-            filename:dirname(?CT_REPORT++"/"++binary_to_list(binary:part(IndexFileData, PosLen)))++"/cover.html";
         _ -> skip
     end,
     CoverageDir = filename:dirname(FilePath)++"/coverage",
@@ -143,6 +111,7 @@ analyze(Node) ->
     Fun = fun(Module, {CAcc, NCAcc}) ->
                   FileName = lists:flatten(io_lib:format("~s.COVER.html",[Module])),
                   FilePathC = filename:join(["/tmp/coverage", FileName]),
+                  io:format("Analysing module ~s~n", [Module]),
                   cover_call(analyse_to_file, [Module, FilePathC, [html]]),
                   {ok, {Module, {C, NC}}} = cover_call(analyse, [Module, module]),
                   file:write(File, row(atom_to_list(Module), C, NC, percent(C,NC),"coverage/"++FileName)),
@@ -165,13 +134,6 @@ get_ejabberd_node() ->
     {ejabberd_node, Node} = proplists:lookup(ejabberd_node, Props),
     Node.
 
-get_tested_nodes() ->
-    {ok, Props} = file:consult(ct_config_file()),
-    case proplists:lookup(ejabberd_nodes, Props) of
-        none -> [];
-        {ejabberd_nodes, Nodes} -> Nodes
-    end.
-
 percent(0, _) -> 0;
 percent(C, NC) when C /= 0; NC /= 0 -> round(C / (NC+C) * 100);
 percent(_, _)                       -> 100.
@@ -186,27 +148,3 @@ row(Row, C, NC, Percent, Path) ->
         "<td>", integer_to_list(C+NC), "</td>",
         "</tr>\n"
     ].
-
-get_node_str({Node, _, _}) ->
-    get_node_str(Node);
-get_node_str(Node) ->
-    atom_to_list(Node).
-
-run_ejabberd({_Node, StartCmd, _}) ->
-    do_start_cmd(StartCmd);
-run_ejabberd(Node) ->
-    do_start_cmd(node_cmd(Node, "start")).
-
-do_start_cmd(StartCmd) ->
-    Status = os:cmd(StartCmd),
-    timer:sleep(3000),
-    Status.
-
-stop_ejabberd({_Node, _, StopCmd}) ->
-    os:cmd(StopCmd);
-stop_ejabberd(Node) ->
-    os:cmd(node_cmd(Node, "stop")).
-
-node_cmd(Node, Cmd) ->
-    lists:flatten(io_lib:format("../../dev/ejabberd_~p/bin/ejabberd ~s",
-                                [Node, Cmd])).
