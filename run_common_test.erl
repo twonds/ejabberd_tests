@@ -42,12 +42,18 @@ tests_to_run() ->
             ],
 
     {ok, Props} = file:consult(ct_config_file()),
-    {ejabberd_configs, Configs} = proplists:lookup(ejabberd_configs, Props),
+    {Suite, Hooks} = case proplists:lookup(ejabberd_configs, Props) of
+        {ejabberd_configs, Configs} ->
+            {lists:flatten(lists:duplicate(length(Configs), Suites)),
+             [{configurations_CTH, [Suites, Configs, get_ejabberd_node()]}]};
+        _ ->
+            {Suites, []}
+    end,
     [{config, [ct_config_file(), ct_vcard_config_file()]},
      {dir, ?CT_DIR},
      {logdir, ?CT_REPORT},
-     {suite, lists:flatten(lists:duplicate(length(Configs), Suites))},
-     {ct_hooks, [{configurations_CTH, [Suites, Configs, get_ejabberd_node()]}]}
+     {suite, Suite},
+     {ct_hooks, Hooks}
     ].
 
 ct() ->
