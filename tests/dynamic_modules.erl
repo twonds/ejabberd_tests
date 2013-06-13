@@ -64,7 +64,7 @@ stop_running(Mod, Config) ->
     case Filtered of
         [] ->
             Config;
-        [{Mod,_Args}=Head|_] ->
-            stop(Domain, Mod), 
+        [{Module,_Args}=Head|_] ->
+            stop(Domain, Module), 
             [{running, [Head]} | Config]
     end.
