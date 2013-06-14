@@ -40,10 +40,11 @@ pre_init_per_suite(Suite, Config,
     call(Node, application, stop, [ejabberd]),
     call(Node, application, start, [ejabberd]),
     error_logger:info_msg("Configuration ~p test started.~n", [Current]),
-    NewConfig = lists:keystore(current_config, 1, Config, {current_config, Current}),
+    NewConfig = add_current(Current, Config),
     {NewConfig, State#state{current=Current, configs=Rest}};
-pre_init_per_suite(_Suite, Config, State) ->
-    {Config, State}.
+pre_init_per_suite(_Suite, Config, #state{current=Current}=State) ->
+    NewConfig = add_current(Current, Config),
+    {NewConfig, State}.
 
 post_end_per_suite(Suite, _Config, Return,
                    #state{current=Current,
@@ -52,6 +53,9 @@ post_end_per_suite(Suite, _Config, Return,
     {Return, State};
 post_end_per_suite(_Suite, _Config, Return, State) ->
     {Return, State}.
+
+add_current(Current, Config) ->
+    lists:keystore(current_config, 1, Config, {current_config, Current}).
 
 call(Node, M, F, A) ->
     rpc:call(Node, M, F, A).

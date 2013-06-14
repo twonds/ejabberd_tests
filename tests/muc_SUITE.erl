@@ -1404,6 +1404,7 @@ admin_member_list(Config) ->
 %%  Examples 137-145
 admin_moderator(Config) ->
     escalus:story(Config, [1,1,1], fun(Alice, Bob, Kate) ->
+        timer:sleep(?WAIT_TIME),
         %% Alice joins room
         escalus:send(Alice, stanza_muc_enter_room(?config(room, Config), <<"alice">>)),
         escalus:wait_for_stanzas(Alice, 2),
@@ -1808,11 +1809,13 @@ muc_user_enter(Config) ->
     escalus:story(Config, [1, 1, 1], fun(_Alice, Bob, Eve) ->
         %Bob enters the room
         escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Bob))),
-        escalus:send(Eve, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Eve))),
+
         Presence = escalus:wait_for_stanza(Bob),
 		is_presence_with_affiliation(Presence, <<"none">>),
 		is_self_presence(Bob, ?config(room, Config), Presence),
         escalus:wait_for_stanza(Bob),   %topic
+
+        escalus:send(Eve, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Eve))),
 
         Presence2 = escalus:wait_for_stanza(Bob),
 		is_presence_with_affiliation(Presence2, <<"none">>),
@@ -1888,8 +1891,8 @@ deny_entry_nick_conflict(Config) ->
     escalus:story(Config, [1, 1, 1], fun(_Alice,  Bob, Eve) ->
         Enter_room_stanza = stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Bob)), 
         escalus:send(Bob, Enter_room_stanza),
-        escalus:send(Eve, Enter_room_stanza),
         escalus:wait_for_stanzas(Bob, 2),
+        escalus:send(Eve, Enter_room_stanza),
         escalus_assert:is_error(escalus:wait_for_stanza(Eve), <<"cancel">>, <<"conflict">>)
     end).
 
@@ -1898,6 +1901,7 @@ deny_entry_nick_conflict(Config) ->
 deny_entry_user_limit_reached(Config) ->
     escalus:story(Config, [1, 1], fun(Alice,  Bob) ->
         escalus:send(Alice , stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Alice))),
+        escalus:wait_for_stanzas(Alice, 2),
         escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Bob))),
         escalus_assert:is_error(escalus:wait_for_stanza(Bob), <<"wait">>, <<"service-unavailable">>)
     end).
@@ -1932,15 +1936,18 @@ enter_room_with_logging(Config) ->
 send_history(Config) ->
     escalus:story(Config, [1, 1, 1], fun(Alice,  Bob, Eve) ->
         escalus:send(Alice , stanza_muc_enter_room(?config(room, Config), nick(Alice))),
+        escalus:wait_for_stanzas(Alice, 2),
         escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), nick(Bob))),
-        escalus:wait_for_stanzas(Alice, 3),
         escalus:wait_for_stanzas(Bob, 3),
+        escalus:wait_for_stanza(Alice),
 		Msg= <<"Hi, Bob!">>,
 		Msg2= <<"Hi, Alice!">>,
 		escalus:send(Alice,escalus_stanza:groupchat_to(room_address(?config(room, Config)), Msg)),
+		escalus:wait_for_stanza(Alice),
+        escalus:wait_for_stanza(Bob),
 		escalus:send(Bob,escalus_stanza:groupchat_to(room_address(?config(room, Config)), Msg2)),
-		escalus:wait_for_stanzas(Alice, 2),
-		escalus:wait_for_stanzas(Bob, 2),
+		escalus:wait_for_stanza(Alice),
+        escalus:wait_for_stanza(Bob),
 
 		%Eve enters and receives the presences, the message history and finally the topic
         escalus:send(Eve, stanza_muc_enter_room(?config(room, Config), nick(Eve))),
@@ -1963,16 +1970,18 @@ send_history(Config) ->
 send_non_anonymous_history(Config) ->
     escalus:story(Config, [1, 1, 1], fun(Alice,  Bob, Eve) ->
         escalus:send(Alice , stanza_muc_enter_room(?config(room, Config), nick(Alice))),
+        escalus:wait_for_stanzas(Alice, 2),
         escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), nick(Bob))),
-        		
-        escalus:wait_for_stanzas(Alice, 3),
         escalus:wait_for_stanzas(Bob, 3),
+        escalus:wait_for_stanza(Alice),
 		Msg= <<"Hi, Bob!">>,
 		Msg2= <<"Hi, Alice!">>,
 		escalus:send(Alice,escalus_stanza:groupchat_to(room_address(?config(room, Config)), Msg)),
+		escalus:wait_for_stanza(Alice),
+        escalus:wait_for_stanza(Bob),
 		escalus:send(Bob,escalus_stanza:groupchat_to(room_address(?config(room, Config)), Msg2)),
-		escalus:wait_for_stanzas(Alice, 2),
-		escalus:wait_for_stanzas(Bob, 2),
+		escalus:wait_for_stanza(Alice),
+        escalus:wait_for_stanza(Bob),
 
 		%Eve enters and receives the presences, the message history and finally the topic
         escalus:send(Eve, stanza_muc_enter_room(?config(room, Config), nick(Eve))),
@@ -1993,15 +2002,18 @@ send_non_anonymous_history(Config) ->
 limit_history_chars(Config) ->
     escalus:story(Config, [1, 1, 1], fun(Alice,  Bob, Eve) ->
         escalus:send(Alice , stanza_muc_enter_room(?config(room, Config), nick(Alice))),
+        escalus:wait_for_stanzas(Alice, 2),
         escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), nick(Bob))),
-        escalus:wait_for_stanzas(Alice, 3),
+        escalus:wait_for_stanza(Alice),
         escalus:wait_for_stanzas(Bob, 3),
 		Msg= <<"Hi, Bob!">>,
 		Msg2= <<"Hi, Alice!">>,
 		escalus:send(Alice,escalus_stanza:groupchat_to(room_address(?config(room, Config)), Msg)),
+		escalus:wait_for_stanza(Alice),
+        escalus:wait_for_stanza(Bob),
 		escalus:send(Bob,escalus_stanza:groupchat_to(room_address(?config(room, Config)), Msg2)),
-		escalus:wait_for_stanzas(Alice, 2),
-		escalus:wait_for_stanzas(Bob, 2),
+		escalus:wait_for_stanza(Alice),
+        escalus:wait_for_stanza(Bob),
 
  		%Eve enters and receives the presences, the message history and finally the topic
         escalus:send(Eve, stanza_muc_enter_room_history_setting(?config(room, Config), nick(Eve), <<"maxchars">>,<<"500">>)),
@@ -2020,15 +2032,18 @@ limit_history_chars(Config) ->
 limit_history_messages(Config) ->
     escalus:story(Config, [1, 1, 1], fun(Alice,  Bob, Eve) ->
         escalus:send(Alice , stanza_muc_enter_room(?config(room, Config), nick(Alice))),
+        escalus:wait_for_stanzas(Alice, 2),
         escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), nick(Bob))),
-        escalus:wait_for_stanzas(Alice, 3),
+        escalus:wait_for_stanza(Alice),
         escalus:wait_for_stanzas(Bob, 3),
 		Msg= <<"Hi, Bob!">>,
 		Msg2= <<"Hi, Alice!">>,
 		escalus:send(Alice,escalus_stanza:groupchat_to(room_address(?config(room, Config)), Msg)),
+ 		escalus:wait_for_stanza(Alice),	
+ 		escalus:wait_for_stanza(Bob),	
 		escalus:send(Bob,escalus_stanza:groupchat_to(room_address(?config(room, Config)), Msg2)),
-		escalus:wait_for_stanzas(Alice, 2),
-		escalus:wait_for_stanzas(Bob, 2),
+ 		escalus:wait_for_stanza(Alice),	
+ 		escalus:wait_for_stanza(Bob),	
 
  		%Eve enters and receives the presences, the message history and finally the topic
         escalus:send(Eve, stanza_muc_enter_room_history_setting(?config(room, Config), nick(Eve), <<"maxstanzas">>,<<"1">>)),
@@ -2047,16 +2062,18 @@ limit_history_messages(Config) ->
 recent_history(Config) ->
     escalus:story(Config, [1, 1, 1], fun(Alice,  Bob, Eve) ->
         escalus:send(Alice , stanza_muc_enter_room(?config(room, Config), nick(Alice))),
+        escalus:wait_for_stanzas(Alice, 2),
         escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), nick(Bob))),
-        escalus:wait_for_stanzas(Alice, 3),
+        escalus:wait_for_stanza(Alice),
         escalus:wait_for_stanzas(Bob, 3),
 		Msg= <<"Hi, Bob!">>,
 		Msg2= <<"Hi, Alice!">>,
 		escalus:send(Alice,escalus_stanza:groupchat_to(room_address(?config(room, Config)), Msg)),
-		timer:sleep(?WAIT_TIME),
+ 		escalus:wait_for_stanza(Alice),	
+ 		escalus:wait_for_stanza(Bob),	
 		escalus:send(Bob,escalus_stanza:groupchat_to(room_address(?config(room, Config)), Msg2)),
-		escalus:wait_for_stanzas(Alice, 2),
-		escalus:wait_for_stanzas(Bob, 2),
+ 		escalus:wait_for_stanza(Alice),	
+ 		escalus:wait_for_stanza(Bob),	
 
  		%Eve enters and receives the presences, the message history and finally the topic
         escalus:send(Eve, stanza_muc_enter_room_history_setting(?config(room, Config), nick(Eve), <<"seconds">>,<<"3">>)),
@@ -2075,16 +2092,19 @@ recent_history(Config) ->
 history_since(Config) ->
     escalus:story(Config, [1, 1, 1], fun(Alice,  Bob, Eve) ->
         escalus:send(Alice , stanza_muc_enter_room(?config(room, Config), nick(Alice))),
+        escalus:wait_for_stanzas(Alice, 2),
         escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), nick(Bob))),
-        escalus:wait_for_stanzas(Alice, 3),
+        escalus:wait_for_stanza(Alice),
         escalus:wait_for_stanzas(Bob, 3),
 		Msg= <<"Hi, Bob!">>,
 		Msg2= <<"Hi, Alice!">>,
 		escalus:send(Alice,escalus_stanza:groupchat_to(room_address(?config(room, Config)), Msg)),
+ 		escalus:wait_for_stanza(Alice),	
+ 		escalus:wait_for_stanza(Bob),	
 		escalus:send(Bob,escalus_stanza:groupchat_to(room_address(?config(room, Config)), Msg2)),
-		escalus:wait_for_stanzas(Alice, 2),
-		escalus:wait_for_stanzas(Bob, 2),
-
+ 		escalus:wait_for_stanza(Alice),	
+ 		escalus:wait_for_stanza(Bob),	
+ 
  		%Eve enters and receives the presences, the message history and finally the topic
         escalus:send(Eve, stanza_muc_enter_room_history_setting(?config(room, Config), nick(Eve), <<"since">>,<<"1970-01-01T00:00:00Z">>)),
  		escalus:wait_for_stanza(Alice),	
@@ -2103,15 +2123,18 @@ history_since(Config) ->
 no_history(Config) ->
     escalus:story(Config, [1, 1, 1], fun(Alice,  Bob, Eve) ->
         escalus:send(Alice , stanza_muc_enter_room(?config(room, Config), nick(Alice))),
+        escalus:wait_for_stanzas(Alice, 2),
         escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), nick(Bob))),
-        escalus:wait_for_stanzas(Alice, 3),
+        escalus:wait_for_stanza(Alice),
         escalus:wait_for_stanzas(Bob, 3),
 		Msg= <<"Hi, Bob!">>,
 		Msg2= <<"Hi, Alice!">>,
 		escalus:send(Alice,escalus_stanza:groupchat_to(room_address(?config(room, Config)), Msg)),
+ 		escalus:wait_for_stanza(Alice),	
+ 		escalus:wait_for_stanza(Bob),	
 		escalus:send(Bob,escalus_stanza:groupchat_to(room_address(?config(room, Config)), Msg2)),
-		escalus:wait_for_stanzas(Alice, 2),
-		escalus:wait_for_stanzas(Bob, 2),
+ 		escalus:wait_for_stanza(Alice),	
+ 		escalus:wait_for_stanza(Bob),	
 
  		%Eve enters and receives the presences, the message history and finally the topic
         escalus:send(Eve, stanza_muc_enter_room_history_setting(?config(room, Config), nick(Eve), <<"maxchars">>,<<"0">>)),
@@ -2147,8 +2170,9 @@ no_subject(Config)->
 send_to_all(Config) ->
     escalus:story(Config, [1, 1, 1], fun(_Alice,  Bob, Eve) ->
         escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Bob))),
+        escalus:wait_for_stanzas(Bob, 2),
         escalus:send(Eve, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Eve))),
-		escalus:wait_for_stanzas(Bob, 3),
+		escalus:wait_for_stanza(Bob),
 		escalus:wait_for_stanzas(Eve, 3),
 
         Msg = <<"chat message">>,
@@ -2164,9 +2188,10 @@ send_to_all(Config) ->
 send_and_receive_private_message(Config) ->
     escalus:story(Config, [1, 1, 1], fun(_Alice,  Bob, Eve) ->
         escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Bob))),
+        escalus:wait_for_stanzas(Bob, 2),
         escalus:send(Eve, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Eve))),
-        escalus:wait_for_stanzas(Bob, 3),
         escalus:wait_for_stanzas(Eve, 3),
+        escalus:wait_for_stanza(Bob),
         		
         Msg = <<"chat message">>,
         ChatMessage = escalus_stanza:chat_to(room_address(?config(room, Config), escalus_utils:get_username(Eve)), Msg),
@@ -2179,9 +2204,10 @@ send_and_receive_private_message(Config) ->
 %Example 48
 send_private_groupchat(Config) ->
     escalus:story(Config, [1, 1, 1], fun(Alice,  Bob, Eve) ->
-		escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), nick(Bob))),
-        escalus:send(Eve, stanza_muc_enter_room(?config(room, Config), nick(Eve))),
-        escalus:wait_for_stanzas(Bob, 3),
+        escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Bob))),
+        escalus:wait_for_stanzas(Bob, 2),
+        escalus:send(Eve, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Eve))),
+        escalus:wait_for_stanza(Bob),
         escalus:wait_for_stanzas(Eve, 3),
 
         Msg = <<"chat message">>,
@@ -2203,9 +2229,10 @@ send_private_groupchat(Config) ->
 % Fails - no 110 status code 
 change_nickname(Config) ->
     escalus:story(Config, [1, 1, 1], fun(_Alice,  Bob, Eve) ->
-        escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), <<"bob">>)),
-        escalus:send(Eve, stanza_muc_enter_room(?config(room, Config), <<"eve">>)),
-        escalus:wait_for_stanzas(Bob, 3),
+        escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Bob))),
+        escalus:wait_for_stanzas(Bob, 2),
+        escalus:send(Eve, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Eve))),
+        escalus:wait_for_stanza(Bob),
         escalus:wait_for_stanzas(Eve, 3),
 
         escalus:send(Bob, stanza_change_nick(?config(room, Config), <<"newbob">>)),
@@ -2226,8 +2253,9 @@ change_nickname(Config) ->
 deny_nickname_change_conflict(Config) ->
     escalus:story(Config, [1, 1, 1], fun(_Alice,  Bob, Eve) ->
         escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), <<"bob">>)),
+        escalus:wait_for_stanzas(Bob, 2),
         escalus:send(Eve, stanza_muc_enter_room(?config(room, Config), <<"eve">>)),
-        escalus:wait_for_stanzas(Bob, 3),
+        escalus:wait_for_stanza(Bob),
         escalus:wait_for_stanzas(Eve, 3),
         escalus:send(Bob, stanza_change_nick(?config(room, Config), <<"eve">>)),
         escalus_assert:is_error(escalus:wait_for_stanza(Bob), <<"cancel">>, <<"conflict">>)
@@ -2241,8 +2269,9 @@ deny_nickname_change_conflict(Config) ->
 change_availability_status(Config) ->
     escalus:story(Config, [1, 1], fun(Alice,  Bob) ->
 		escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), nick(Bob))),
+        escalus:wait_for_stanzas(Bob, 2),
         escalus:send(Alice, stanza_muc_enter_room(?config(room, Config), nick(Alice))),
-        escalus:wait_for_stanzas(Bob, 3),
+        escalus:wait_for_stanza(Bob),
         escalus:wait_for_stanzas(Alice, 3),
         Status = <<"Bobs awesome new status">>,
         escalus:send(Bob, stanza_change_availability(Status, ?config(room, Config), nick(Bob))),
@@ -2310,9 +2339,8 @@ one2one_chat_to_muc(Config) ->
         is_invitation(escalus:wait_for_stanza(Eve)),
         %Bob and Eve accept the invitations
         escalus:send(Bob, stanza_muc_enter_room(Room, <<"bob">>)),
-        timer:sleep(?WAIT_TIME),
+        escalus:wait_for_stanzas(Bob, 2),
         escalus:send(Eve, stanza_muc_enter_room(Room, <<"eve">>)),
-        escalus:wait_for_stanzas(Bob, 2), %presences; bob receives the history before he receves Eves presence
         escalus:wait_for_stanzas(Eve, 3), %presences
         %Bob and Eve receive the history
         is_history_message_correct(Room, <<"alice">>,<<"groupchat">>,<<"Hi,Bob!">>, escalus:wait_for_stanza(Bob)),
@@ -2374,11 +2402,14 @@ one2one_chat_to_muc(Config) ->
 exit_room(Config) ->
     escalus:story(Config, [1, 1, 1], fun(Alice,  Bob, Eve) ->
         escalus:send(Alice, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Alice))),
+        escalus:wait_for_stanzas(Alice, 2),
         escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Bob))),
+        escalus:wait_for_stanzas(Bob, 3),
+        escalus:wait_for_stanza(Alice),
         escalus:send(Eve, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Eve))),
-		escalus:wait_for_stanzas(Alice, 4),
-        escalus:wait_for_stanzas(Bob, 4),
         escalus:wait_for_stanzas(Eve, 4),
+        escalus:wait_for_stanza(Alice),
+        escalus:wait_for_stanza(Bob),
 		escalus:send(Alice, stanza_to_room(escalus_stanza:presence(<<"unavailable">>), ?config(room, Config), escalus_utils:get_username(Alice))),
 		Message = escalus:wait_for_stanza(Alice),
 		has_status_codes(Message, [<<"110">>]),
@@ -2394,11 +2425,14 @@ exit_room(Config) ->
 exit_room_with_status(Config) ->
     escalus:story(Config, [1, 1, 1], fun(Alice,  Bob, Eve) ->
         escalus:send(Alice, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Alice))),
+        escalus:wait_for_stanzas(Alice, 2),
         escalus:send(Bob, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Bob))),
+        escalus:wait_for_stanzas(Bob, 3),
+        escalus:wait_for_stanza(Alice),
         escalus:send(Eve, stanza_muc_enter_room(?config(room, Config), escalus_utils:get_username(Eve))),
-		escalus:wait_for_stanzas(Alice, 4),
-        escalus:wait_for_stanzas(Bob, 4),
         escalus:wait_for_stanzas(Eve, 4),
+        escalus:wait_for_stanza(Alice),
+        escalus:wait_for_stanza(Bob),
 
 		Status = <<"Alices exit status">>,
 		StatusXml = #xmlel{name = <<"status">>, children = [#xmlcdata{content=Status}]},
