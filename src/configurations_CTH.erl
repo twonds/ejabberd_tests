@@ -39,7 +39,7 @@ pre_init_per_suite(Suite, Config,
     ok = call(Node, file, write_file, [CfgFile, NewCfgFile]),
     call(Node, application, stop, [ejabberd]),
     call(Node, application, start, [ejabberd]),
-    error_logger:info_msg("Configuration ~p test started.~n", [Current]),
+    ct:print("Configuration ~p test started.~n", [Current]),
     NewConfig = add_current(Current, Config),
     {NewConfig, State#state{current=Current, configs=Rest}};
 pre_init_per_suite(_Suite, Config, #state{current=Current}=State) ->
@@ -49,7 +49,7 @@ pre_init_per_suite(_Suite, Config, #state{current=Current}=State) ->
 post_end_per_suite(Suite, _Config, Return,
                    #state{current=Current,
                           last=Suite}=State) ->
-    error_logger:info_msg("Configuration ~p test finished.~n", [Current]),
+    ct:print("Configuration ~p test finished.~n", [Current]),
     {Return, State};
 post_end_per_suite(_Suite, _Config, Return, State) ->
     {Return, State}.
