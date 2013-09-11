@@ -14,7 +14,7 @@ ct_vcard_config_file() ->
 
 
 tests_to_run() ->
-    Suites = [
+    [{suite, [
             adhoc_SUITE,
             anonymous_SUITE,
             last_SUITE,
@@ -39,43 +39,69 @@ tests_to_run() ->
             metrics_register_SUITE,
             metrics_session_SUITE,
             system_monitor_SUITE
-            ],
+            ]}].
 
-    {ok, Props} = file:consult(ct_config_file()),
-    {Suite, Hooks} = case proplists:lookup(ejabberd_configs, Props) of
-        {ejabberd_configs, Configs} ->
-            {lists:flatten(lists:duplicate(length(Configs), Suites)),
-             [{configurations_CTH, [Suites, Configs, get_ejabberd_node()]}]};
-        _ ->
-            {Suites, []}
-    end,
-    [{config, [ct_config_file(), ct_vcard_config_file()]},
-     {dir, ?CT_DIR},
-     {logdir, ?CT_REPORT},
-     {suite, Suite},
-     {ct_hooks, Hooks}
-    ].
+    %[{suite, muc_SUITE},
+     %{group, admin},
+     %{testcase, admin_moderator},
+     %{repeat, 4}].
 
 ct() ->
-    Result = ct:run_test(tests_to_run()),
+    Result = ct:run_test(prepare_tests()),
     case Result of
         {error, Reason} ->
             throw({ct_error, Reason});
         _ ->
             ok
     end,
+    save_count(),
     init:stop(0).
 
 ct_cover() ->
     run_ct_cover(),
     cover_summary(),
+    save_count(),
     init:stop(0).
+
+save_count() ->
+    Count = try
+        [{count, N}] = ets:lookup(configurations_CTH, count),
+        N
+    catch _:_ ->
+        1
+    end,
+    file:write_file("/tmp/ct_count", integer_to_list(Count)).
+
+prepare_tests() ->
+    {ok, Props} = file:consult(ct_config_file()),
+    Tests = tests_to_run(),
+    Suites = proplists:get_value(suite, Tests, []),
+    Spec1 = [{config, [ct_config_file(), ct_vcard_config_file()]},
+             {dir, ?CT_DIR},
+             {logdir, ?CT_REPORT},
+             {suite, Suites}
+            ],
+    Spec2 = case proplists:lookup(ejabberd_configs, Props) of
+        {ejabberd_configs, Configs} ->
+            ets:new(configurations_CTH, [public, named_table,
+                                         {read_concurrency, true}]),
+            ets:insert(configurations_CTH, {count, 0}),
+            Interval = proplists:get_value(repeat, Tests, 1),
+            [{repeat, length(Configs)*Interval},
+             {ct_hooks, 
+              [{configurations_CTH, [Configs, get_ejabberd_node(), Interval]}]}
+             | Spec1];
+        _ ->
+            Spec1
+    end,
+    Spec2 ++ Tests.
 
 run_ct_cover() ->
     prepare(),
     ct:run_test(tests_to_run()),
-    Files = rpc:call(get_ejabberd_node(), filelib, wildcard, ["/tmp/ejd_test_run_*.coverdata"]),
-    [file:delete(File) || File <- Files],
+    N = get_ejabberd_node(),
+    Files = rpc:call(N, filelib, wildcard, ["/tmp/ejd_test_run_*.coverdata"]),
+    [rpc:call(N, file, delete, [File]) || File <- Files],
     {MS,S,_} = now(),
     FileName = lists:flatten(io_lib:format("/tmp/ejd_test_run_~b~b.coverdata",[MS,S])),
     io:format("export current cover ~p~n", [cover_call(export, [FileName])]),
